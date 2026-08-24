@@ -1,0 +1,194 @@
+<?php
+
+// app/Http/Controllers/BAPSI/MooraController.php
+
+namespace App\Http\Controllers\BAPSI;
+
+use App\Http\Controllers\Controller;
+use App\Models\CalonMahasiswa;
+use App\Models\HasilMoora;
+use App\Models\Kriteria;
+use App\Models\Keputusan;
+use App\Models\Prodi;
+use App\Services\MooraService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class MooraController extends Controller
+{
+    public function __construct(private MooraService $mooraService) {}
+
+    // ================================================================
+    // INDEX — Tampilan utama Hitung MOORA
+    // ================================================================
+   public function index(Request $request)
+{
+    // Daftar tahun dari DB
+    $tahunList = CalonMahasiswa::whereIn('status', ['lulus_verifikasi', 'ditetapkan'])
+        ->distinct()
+        ->orderByDesc('tahun_akademik')
+        ->pluck('tahun_akademik');
+
+    $defaultTahun = $tahunList->first() ?? date('Y') . '/' . (date('Y') + 1);
+    $tahun        = $request->get('tahun', $defaultTahun);
+    $prodiFilter  = $request->get('prodi_id', '');   // ← TAMBAH INI
+
+    // Data calon untuk tahun ini
+    $calons = CalonMahasiswa::with('prodi')
+        ->whereIn('status', ['lulus_verifikasi', 'ditetapkan'])
+        ->where('tahun_akademik', $tahun)
+        ->get();
+
+    // Statistik calon per prodi (untuk preview sebelum hitung)
+    $calonPerProdi = $calons->groupBy('prodi_id')->map(function ($items) {
+        return [
+            'prodi' => $items->first()?->prodi,
+            'total' => $items->count(),
+        ];
+    })->values();
+
+    // Cek apakah hasil sudah ada
+    $hasilAda = HasilMoora::where('periode_tahun', $tahun)->exists();
+
+    // Ambil hasil per prodi (jika sudah dihitung)
+    $rankingPerProdi = collect();
+    if ($hasilAda) {
+        $rankingPerProdi = $this->mooraService->getRankingPerProdi($tahun);
+
+        // Filter per prodi jika dipilih  ← TAMBAH INI
+        if ($prodiFilter !== '') {
+            $rankingPerProdi = $rankingPerProdi->filter(
+                fn($g) => $g['prodi']?->id == $prodiFilter
+            )->values();
+        }
+    }
+
+    // Statistik hasil (selalu dari semua prodi, tidak ikut filter)
+    $statistik = $hasilAda
+        ? $this->mooraService->getStatistik($tahun)
+        : null;
+
+    // Kriteria aktif
+    $kriterias = Kriteria::where('is_active', true)->orderBy('urutan')->get();
+
+    // Daftar prodi yang punya data MOORA (untuk dropdown filter)  ← TAMBAH INI
+    $prodis = $hasilAda
+        ? Prodi::whereIn('id',
+            HasilMoora::where('periode_tahun', $tahun)->distinct()->pluck('prodi_id')
+          )->orderBy('nama')->get()
+        : collect();
+
+    return view('bapsi.moora.index', compact(
+        'calons', 'calonPerProdi', 'kriterias',
+        'hasilAda', 'rankingPerProdi', 'statistik',
+        'tahun', 'tahunList',
+        'prodis', 'prodiFilter'   // ← TAMBAH INI
+    ));
+}
+
+    // ================================================================
+    // HITUNG — Jalankan perhitungan MOORA
+    // ================================================================
+    public function hitung(Request $request)
+    {
+        $tahun = $request->input('tahun', '');
+
+        if (empty($tahun)) {
+            return back()->with('error', 'Periode tahun tidak boleh kosong.');
+        }
+
+        $hasil = $this->mooraService->hitung($tahun, auth()->id());
+
+        if (isset($hasil['error'])) {
+            return back()->with('error', $hasil['error']);
+        }
+
+        $totalCalon = count($hasil);
+        $totalProdi = collect($hasil)->unique('prodi_id')->count();
+
+        return redirect()
+            ->route('bapsi.moora.index', ['tahun' => $tahun])
+            ->with('success',
+                "✅ Perhitungan MOORA selesai. {$totalCalon} calon dari {$totalProdi} prodi telah diranking."
+            );
+    }
+
+    // ================================================================
+    // DETAIL — Detail perhitungan satu calon
+    // ================================================================
+    public function detail($id)
+    {
+        $hasil = HasilMoora::with(['calon.prodi'])->findOrFail($id);
+
+        // Decode JSON detail_hitung
+        $rawDetail = is_array($hasil->detail_hitung)
+            ? $hasil->detail_hitung
+            : (json_decode($hasil->detail_hitung, true) ?? []);
+
+        // Normalisasi struktur — toleran format lama & baru
+        $detail = [];
+        foreach ($rawDetail as $key => $n) {
+            $detail[$key] = [
+                'label'      => $n['label']      ?? $key,
+                'nilai_asli' => $n['nilai_asli']  ?? $n['nilai'] ?? null,
+                'nilai_skor' => $n['nilai_skor']  ?? $n['nilai'] ?? null,
+                'normalized' => $n['normalized']  ?? 0,
+                'weighted'   => $n['weighted']    ?? 0,
+                'type'       => $n['type']        ?? 'benefit',
+                'bobot'      => $n['bobot']       ?? 0,
+            ];
+        }
+
+        $kriteriaInfo = MooraService::kriteriaList();
+
+        return view('bapsi.moora.detail', compact('hasil', 'detail', 'kriteriaInfo'));
+    }
+
+    // ================================================================
+    // RESET — Hapus semua data MOORA untuk tahun tertentu
+    // ================================================================
+    public function reset(Request $request)
+    {
+        $tahun = $request->input('tahun');
+
+        DB::beginTransaction();
+        try {
+            $query = HasilMoora::query();
+            if ($tahun) $query->where('periode_tahun', $tahun);
+            $hasilIds = $query->pluck('id');
+
+            // Hapus keputusan (child) → hasil_moora (parent)
+            Keputusan::whereIn('hasil_moora_id', $hasilIds)->delete();
+            HasilMoora::whereIn('id', $hasilIds)->delete();
+
+            // Reset skor & ranking di calon_mahasiswa
+            $calonQ = CalonMahasiswa::query();
+            if ($tahun) $calonQ->where('tahun_akademik', $tahun);
+            $calonQ->update(['skor_moora' => null, 'ranking' => null]);
+
+            DB::commit();
+
+            $ket = $tahun ? "periode {$tahun}" : "semua periode";
+            return back()->with('success', "Data MOORA untuk {$ket} berhasil direset.");
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Reset MOORA: ' . $e->getMessage());
+            return back()->with('error', 'Gagal reset: ' . $e->getMessage());
+        }
+    }
+
+    // ================================================================
+    // KIRIM KE LKM — Notifikasi saja (data sudah otomatis tersedia)
+    // ================================================================
+    public function kirimKeLKM(Request $request)
+    {
+        $tahun = $request->input('tahun', '');
+        $count = HasilMoora::where('periode_tahun', $tahun)->count();
+        return back()->with('success',
+            "Hasil MOORA ({$count} ranking dari " .
+            HasilMoora::where('periode_tahun', $tahun)->distinct('prodi_id')->count('prodi_id') .
+            " prodi) telah tersedia untuk LKM."
+        );
+    }
+}

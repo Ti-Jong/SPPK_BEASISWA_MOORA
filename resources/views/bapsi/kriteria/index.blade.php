@@ -1,0 +1,383 @@
+@extends('layouts.app')
+@section('title','Master Kriteria')
+@section('page-title','Master Kriteria & Skor')
+
+@push('styles')
+<style>
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:#fff; border-radius:16px; padding:28px; width:500px; max-width:94vw; box-shadow:0 20px 60px rgba(0,0,0,0.3); animation:modalIn .2s ease; }
+@keyframes modalIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+.modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.modal-header h3 { font-size:1rem; font-weight:700; }
+.modal-close { background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted); padding:4px 8px; border-radius:6px; }
+.modal-close:hover { background:var(--bg); }
+.modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
+.sub-edit-row { display:none; background:#f8fafc; }
+.sub-edit-row.active { display:table-row; }
+</style>
+@endpush
+
+@section('content')
+
+@if(session('success'))
+<div class="alert alert-success"><i class="fas fa-check-circle"></i> {{ session('success') }}</div>
+@endif
+
+@if(session('error'))
+<div class="alert alert-danger"><i class="fas fa-times-circle"></i> {{ session('error') }}</div>
+@endif
+
+@if($errors->any())
+<div class="alert alert-danger">
+    <i class="fas fa-times-circle"></i>
+    <ul style="margin:4px 0 0 18px">
+        @foreach($errors->all() as $e)
+        <li>{{ $e }}</li>
+        @endforeach
+    </ul>
+</div>
+@endif
+
+<div class="alert alert-info"><i class="fas fa-info-circle"></i> Kelola kriteria dan sub kriteria (range skor) yang digunakan dalam perhitungan MOORA.</div>
+
+{{-- ▼▼▼ INFO TOTAL BOBOT KRITERIA AKTIF ▼▼▼ --}}
+@php
+    $totalBobotAktif = $kriterias->where('is_active', true)->sum('bobot');
+    $sisaBobot = max(0, 1 - $totalBobotAktif);
+@endphp
+
+<div class="alert {{ $totalBobotAktif == 1 ? 'alert-info' : 'alert-warning' }}" style="margin-bottom:12px">
+    <i class="fas fa-balance-scale"></i>
+    Total bobot kriteria aktif saat ini: <strong>{{ round($totalBobotAktif * 100, 1) }}%</strong>
+    @if($sisaBobot > 0)
+        — sisa yang bisa dipakai: <strong>{{ round($sisaBobot * 100, 1) }}%</strong>
+    @elseif($totalBobotAktif > 1)
+        — <strong style="color:#dc2626">melebihi 100%! segera perbaiki.</strong>
+    @endif
+</div>
+{{-- ▲▲▲ SAMPAI SINI ▲▲▲ --}}
+
+<div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+    <button class="btn btn-primary" onclick="openModal('modal-tambah-kriteria')">
+        <i class="fas fa-plus"></i> Tambah Kriteria
+    </button>
+</div>
+
+@foreach($kriterias as $k)
+<div class="card" style="margin-bottom:20px">
+
+    {{-- Header --}}
+    <div class="card-header" style="cursor:pointer"
+         onclick="toggleCard('card-body-{{ $k->id }}', 'chevron-{{ $k->id }}')">
+        <div>
+            <h3>
+                <span style="color:var(--primary-light)">{{ $k->kode }}</span> — {{ $k->nama }}
+            </h3>
+            <span style="font-size:0.78rem;color:var(--text-muted)">
+                Bobot: <strong>{{ $k->bobot*100 }}%</strong> &nbsp;|&nbsp;
+                Tipe: <span class="badge {{ $k->tipe==='benefit'?'b-success':'b-danger' }}">{{ strtoupper($k->tipe) }}</span>
+                &nbsp;|&nbsp; {{ $k->subKriterias->count() }} sub kriteria
+            </span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-outline btn-sm"
+                    onclick="event.stopPropagation(); openEditKriteria({{ $k->id }}, '{{ $k->kode }}', '{{ addslashes($k->nama) }}', '{{ $k->tipe }}', {{ $k->bobot }}, {{ $k->urutan }})">
+                <i class="fas fa-edit"></i> Edit
+            </button>
+
+            {{-- ▼▼▼ TOMBOL HAPUS BARU — konfirmasi ketik ulang kode ▼▼▼ --}}
+            <form method="POST" action="{{ route('bapsi.kriteria.destroy', $k) }}"
+                  style="display:inline" onclick="event.stopPropagation()">
+                @csrf @method('DELETE')
+                <button type="button" class="btn btn-danger btn-sm"
+                        onclick="confirmHapusKriteria(this, '{{ $k->kode }}', '{{ addslashes($k->nama) }}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </form>
+            {{-- ▲▲▲ SAMPAI SINI ▲▲▲ --}}
+
+            <i id="chevron-{{ $k->id }}" class="fas fa-chevron-down"
+               style="color:var(--text-muted);font-size:0.85rem;transition:transform .3s;
+                      transform:{{ $loop->first ? 'rotate(0deg)' : 'rotate(-90deg)' }}"></i>
+        </div>
+    </div>
+
+    {{-- Body collapsible --}}
+    <div id="card-body-{{ $k->id }}" style="{{ $loop->first ? '' : 'display:none' }}">
+        <div class="card-body" style="padding:0">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Label / Range</th>
+                            <th>Nilai String</th>
+                            <th>Range Min (Rp)</th>
+                            <th>Range Max (Rp)</th>
+                            <th>Skor</th>
+                            <th style="text-align:center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($k->subKriterias as $s)
+                    <tr id="row-{{ $s->id }}">
+                        <td><strong>{{ $s->label }}</strong></td>
+                        <td>{{ $s->nilai_string ?? '-' }}</td>
+                        <td>{{ $s->range_min !== null ? 'Rp '.number_format($s->range_min,0,',','.') : '-' }}</td>
+                        <td>{{ $s->range_max !== null ? 'Rp '.number_format($s->range_max,0,',','.') : '-' }}</td>
+                        <td>
+                            <span style="background:var(--primary);color:#fff;border-radius:6px;padding:3px 10px;font-weight:700">
+                                {{ $s->skor }}
+                            </span>
+                        </td>
+                        <td style="text-align:center;white-space:nowrap">
+                            <button class="btn btn-outline btn-sm" onclick="toggleEditSub({{ $s->id }})">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <form method="POST" action="{{ route('bapsi.sub-kriteria.destroy', $s) }}" style="display:inline">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-danger btn-sm" onclick="return confirm('Hapus sub kriteria ini?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr class="sub-edit-row" id="edit-row-{{ $s->id }}">
+                        <td colspan="6" style="padding:12px 16px;background:#f0f4f8">
+                            <form method="POST" action="{{ route('bapsi.sub-kriteria.update', $s) }}"
+                                  style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                                @csrf @method('PUT')
+                                <div class="f-group" style="min-width:150px">
+                                    <label>Label</label>
+                                    <input type="text" name="label" value="{{ $s->label }}" required>
+                                </div>
+                                <div class="f-group" style="min-width:120px">
+                                    <label>Nilai String</label>
+                                    <input type="text" name="nilai_string" value="{{ $s->nilai_string }}">
+                                </div>
+                                <div class="f-group" style="min-width:120px">
+                                    <label>Range Min</label>
+                                    <input type="number" name="range_min" value="{{ $s->range_min }}">
+                                </div>
+                                <div class="f-group" style="min-width:120px">
+                                    <label>Range Max</label>
+                                    <input type="number" name="range_max" value="{{ $s->range_max }}">
+                                </div>
+                                <div class="f-group" style="min-width:80px">
+                                    <label>Skor (1-10)</label>
+                                    <input type="number" name="skor" value="{{ $s->skor }}" min="0" max="10" required>
+                                </div>
+                                <div style="display:flex;gap:6px">
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-save"></i> Simpan
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-sm"
+                                            onclick="toggleEditSub({{ $s->id }})">
+                                        <i class="fas fa-times"></i> Batal
+                                    </button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">
+                            Belum ada sub kriteria. Tambahkan di bawah.
+                        </td>
+                    </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- Form Tambah Sub Kriteria --}}
+            <div style="padding:16px;border-top:1px solid var(--border);background:#fafbfc">
+                <p style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase">
+                    <i class="fas fa-plus-circle" style="color:var(--primary-light)"></i>
+                    Tambah Sub Kriteria untuk {{ $k->kode }}
+                </p>
+                <form method="POST" action="{{ route('bapsi.sub-kriteria.store', $k) }}"
+                      style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                    @csrf
+                    <div class="f-group" style="min-width:150px">
+                        <label>Label *</label>
+                        <input type="text" name="label" placeholder="misal: ≤ Rp 1jt" required>
+                    </div>
+                    <div class="f-group" style="min-width:120px">
+                        <label>Nilai String</label>
+                        <input type="text" name="nilai_string" placeholder="mis: yatim">
+                    </div>
+                    <div class="f-group" style="min-width:120px">
+                        <label>Range Min</label>
+                        <input type="number" name="range_min" placeholder="0">
+                    </div>
+                    <div class="f-group" style="min-width:120px">
+                        <label>Range Max</label>
+                        <input type="number" name="range_max" placeholder="1000000">
+                    </div>
+                    <div class="f-group" style="min-width:80px">
+                        <label>Skor (1-10) *</label>
+                        <input type="number" name="skor" min="0" max="10" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus"></i> Tambah
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>{{-- end collapsible --}}
+
+</div>{{-- end card --}}
+@endforeach
+
+{{-- MODAL: Tambah Kriteria --}}
+<div class="modal-overlay" id="modal-tambah-kriteria" onclick="closeModalOutside(event, 'modal-tambah-kriteria')">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle" style="color:var(--primary-light)"></i> Tambah Kriteria Baru</h3>
+            <button class="modal-close" onclick="closeModal('modal-tambah-kriteria')">&times;</button>
+        </div>
+        <form method="POST" action="{{ route('bapsi.kriteria.store') }}">
+            @csrf
+            <div class="form-grid" style="gap:14px">
+                <div class="f-group">
+                    <label>Kode Kriteria * <span style="font-size:0.72rem;color:var(--text-muted)">(misal: C5)</span></label>
+                    <input type="text" name="kode" placeholder="C5" maxlength="5" required style="text-transform:uppercase">
+                </div>
+                <div class="f-group">
+                    <label>Urutan *</label>
+                    <input type="number" name="urutan" placeholder="5" min="1" required>
+                </div>
+                <div class="f-group" style="grid-column:1/-1">
+                    <label>Nama Kriteria *</label>
+                    <input type="text" name="nama" placeholder="misal: IPK Semester Terakhir" required>
+                </div>
+                <div class="f-group">
+                    <label>Tipe *</label>
+                    <select name="tipe" required>
+                        <option value="benefit">Benefit (semakin tinggi semakin baik)</option>
+                        <option value="cost">Cost (semakin rendah semakin baik)</option>
+                    </select>
+                </div>
+                <div class="f-group">
+                    <label>Bobot * <span style="font-size:0.72rem;color:var(--text-muted)">(0.01 – {{ round($sisaBobot,2) }} tersisa)</span></label>
+                    <input type="number" name="bobot" placeholder="0.10" min="0.01" max="1" step="0.01" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modal-tambah-kriteria')">Batal</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Kriteria</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- MODAL: Edit Kriteria --}}
+<div class="modal-overlay" id="modal-edit-kriteria" onclick="closeModalOutside(event, 'modal-edit-kriteria')">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit" style="color:var(--primary-light)"></i> Edit Kriteria</h3>
+            <button class="modal-close" onclick="closeModal('modal-edit-kriteria')">&times;</button>
+        </div>
+        <form method="POST" id="form-edit-kriteria">
+            @csrf @method('PUT')
+            <div class="form-grid" style="gap:14px">
+                <div class="f-group">
+                    <label>Kode Kriteria *</label>
+                    <input type="text" id="edit-kode" name="kode" maxlength="5" required style="text-transform:uppercase">
+                </div>
+                <div class="f-group">
+                    <label>Urutan *</label>
+                    <input type="number" id="edit-urutan" name="urutan" min="1" required>
+                </div>
+                <div class="f-group" style="grid-column:1/-1">
+                    <label>Nama Kriteria *</label>
+                    <input type="text" id="edit-nama" name="nama" required>
+                </div>
+                <div class="f-group">
+                    <label>Tipe *</label>
+                    <select id="edit-tipe" name="tipe" required>
+                        <option value="benefit">Benefit</option>
+                        <option value="cost">Cost</option>
+                    </select>
+                </div>
+                <div class="f-group">
+                    <label>Bobot * <span style="font-size:0.72rem;color:var(--text-muted)">(0.01 – 1.00)</span></label>
+                    <input type="number" id="edit-bobot" name="bobot" min="0.01" max="1" step="0.01" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit-kriteria')">Batal</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Kriteria</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+function toggleCard(bodyId, chevronId) {
+    const body    = document.getElementById(bodyId);
+    const chevron = document.getElementById(chevronId);
+    const isHidden = body.style.display === 'none';
+    body.style.display      = isHidden ? '' : 'none';
+    chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+}
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+    document.body.style.overflow = '';
+}
+function closeModalOutside(e, id) {
+    if (e.target.id === id) closeModal(id);
+}
+function openEditKriteria(id, kode, nama, tipe, bobot, urutan) {
+    document.getElementById('edit-kode').value   = kode;
+    document.getElementById('edit-nama').value   = nama;
+    document.getElementById('edit-tipe').value   = tipe;
+    document.getElementById('edit-bobot').value  = bobot;
+    document.getElementById('edit-urutan').value = urutan;
+    document.getElementById('form-edit-kriteria').action =
+        '{{ url("bapsi/kriteria") }}/' + id;
+    openModal('modal-edit-kriteria');
+}
+function toggleEditSub(id) {
+    const editRow = document.getElementById('edit-row-' + id);
+    const isActive = editRow.classList.contains('active');
+    document.querySelectorAll('.sub-edit-row.active').forEach(r => r.classList.remove('active'));
+    if (!isActive) {
+        editRow.classList.add('active');
+        editRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// ▼▼▼ KONFIRMASI HAPUS KRITERIA — ketik ulang kode, bukan cuma confirm() biasa ▼▼▼
+function confirmHapusKriteria(btn, kode, nama) {
+    const input = prompt(
+        `PERHATIAN: Anda akan menghapus kriteria [${kode}] "${nama}".\n` +
+        `Ini akan menghapus SEMUA sub kriteria di dalamnya.\n\n` +
+        `Ketik "${kode}" untuk konfirmasi:`
+    );
+    if (input === kode) {
+        btn.closest('form').submit();
+    } else if (input !== null) {
+        alert('Kode tidak cocok. Penghapusan dibatalkan.');
+    }
+}
+// ▲▲▲ SAMPAI SINI ▲▲▲
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => {
+            m.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+    }
+});
+</script>
+@endpush
+
+@endsection

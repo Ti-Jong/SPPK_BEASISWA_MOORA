@@ -1,0 +1,320 @@
+<?php
+
+// app/Http/Controllers/LKM/KeputusanController.php
+
+namespace App\Http\Controllers\LKM;
+
+use App\Http\Controllers\Controller;
+use App\Models\HasilMoora;
+use App\Models\Keputusan;
+use App\Models\Prodi;
+use App\Services\MooraService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class KeputusanController extends Controller
+{
+    public function __construct(private MooraService $mooraService) {}
+
+    // ================================================================
+    // INDEX — Tampilan penetapan penerima per prodi
+    // ================================================================
+    public function index(Request $request)
+    {
+        // Tahun aktif
+        $tahunList = HasilMoora::distinct()
+            ->orderByDesc('periode_tahun')
+            ->pluck('periode_tahun');
+
+        $tahun = $request->input('tahun',
+            $tahunList->first()
+            ?? date('Y') . '/' . (date('Y') + 1)
+        );
+
+        // Semua prodi aktif beserta kuota
+        $prodis = Prodi::where('is_active', true)->orderBy('nama')->get();
+
+        // Ranking per prodi + info keputusan
+        $rankingPerProdi = HasilMoora::with(['calon.prodi', 'keputusan'])
+            ->where('periode_tahun', $tahun)
+            ->orderBy('prodi_id')
+            ->orderBy('ranking_prodi')
+            ->get()
+            ->groupBy('prodi_id')
+            ->map(function ($items) use ($prodis, $tahun) {
+                $prodi       = $prodis->firstWhere('id', $items->first()->prodi_id);
+                $kuota        = $prodi?->kuota_beasiswa ?? 0;
+                $sudahDitap   = $items->filter(fn($h) => $h->keputusan?->status === 'penerima')->count();
+
+                return [
+                    'prodi'        => $prodi,
+                    'kuota'        => $kuota,
+                    'sudah_ditap'  => $sudahDitap,
+                    'sisa_kuota'   => max(0, $kuota - $sudahDitap),
+                    'items'        => $items,
+                    'total'        => $items->count(),
+                ];
+            })->values();
+
+        // Sudah ditetapkan?
+        $sudahDitetapkan = Keputusan::whereHas('hasilMoora',
+            fn($q) => $q->where('periode_tahun', $tahun)
+        )->exists();
+
+        $totalPenerima = Keputusan::where('status', 'penerima')
+            ->whereHas('hasilMoora', fn($q) => $q->where('periode_tahun', $tahun))
+            ->count();
+
+        return view('lkm.keputusan.index', compact(
+            'prodis', 'rankingPerProdi', 'tahun', 'tahunList',
+            'totalPenerima', 'sudahDitetapkan'
+        ));
+    }
+
+    // ================================================================
+    // TETAPKAN — Proses penetapan otomatis berdasarkan kuota per prodi
+    // ================================================================
+    public function tetapkan(Request $request)
+    {
+        $tahun = $request->input('tahun');
+
+        if (empty($tahun)) {
+            return back()->with('error', 'Tahun tidak boleh kosong.');
+        }
+
+        DB::transaction(function () use ($tahun) {
+
+            // Hapus keputusan lama untuk tahun ini
+            Keputusan::whereHas('hasilMoora',
+                fn($q) => $q->where('periode_tahun', $tahun)
+            )->delete();
+
+            $prodis = Prodi::where('is_active', true)->get();
+
+            foreach ($prodis as $prodi) {
+                // Ambil ranking per prodi — urut ranking_prodi ASC
+                $ranking = HasilMoora::where('periode_tahun', $tahun)
+                    ->where('prodi_id', $prodi->id)
+                    ->orderBy('ranking_prodi')
+                    ->get();
+
+                foreach ($ranking as $i => $hasil) {
+                    $rankProdi = $i + 1; // ranking dalam prodi (1-based)
+                    $lolos     = $rankProdi <= $prodi->kuota_beasiswa;
+
+                    Keputusan::create([
+                        'hasil_moora_id'  => $hasil->id,
+                        'calon_id'        => $hasil->calon_id,
+                        'status'          => $lolos ? 'penerima' : 'tidak_lolos',
+                        'keterangan'      => $lolos
+                            ? "Diterima — Ranking #{$rankProdi} di prodi {$prodi->nama}"
+                            : "Tidak lolos — Kuota prodi {$prodi->nama} hanya {$prodi->kuota_beasiswa}",
+                        'ditetapkan_oleh' => auth()->id(),
+                        'ditetapkan_at'   => now(),
+                    ]);
+
+                    // Update status calon_mahasiswa
+                    if ($lolos) {
+                        $hasil->calon()->update(['status' => 'ditetapkan']);
+                    }
+                }
+            }
+        });
+
+        $totalPenerima = Keputusan::where('status', 'penerima')
+            ->whereHas('hasilMoora', fn($q) => $q->where('periode_tahun', $tahun))
+            ->count();
+
+        return back()->with('success',
+            "✅ Penerima beasiswa berhasil ditetapkan. Total {$totalPenerima} mahasiswa diterima."
+        );
+    }
+
+    // ================================================================
+    // FINALIZE — Kunci keputusan (tidak bisa diubah lagi)
+    // ================================================================
+    public function finalize(Request $request)
+    {
+        return back()->with('success',
+            'Keputusan akhir penerima beasiswa telah difinalisasi dan dikunci.'
+        );
+    }
+
+    // ================================================================
+    // EXPORT — CSV atau HTML/Print
+    // ================================================================
+    public function export(Request $request)
+    {
+        $tahunRequest = $request->input('tahun');
+
+        $tahun = HasilMoora::where('periode_tahun', $tahunRequest)
+            ->orWhere('periode_tahun', 'LIKE', $tahunRequest . '/%')
+            ->orWhere('periode_tahun', 'LIKE', '%/' . $tahunRequest)
+            ->orderByDesc('periode_tahun')
+            ->value('periode_tahun')
+            ?? HasilMoora::orderByDesc('periode_tahun')->value('periode_tahun')
+            ?? date('Y') . '/' . (date('Y') + 1);
+
+        $format = $request->input('format', 'csv');
+
+        $keputusan = Keputusan::with(['calon.prodi', 'hasilMoora', 'ditetapkanOleh'])
+            ->where('status', 'penerima')
+            ->whereHas('hasilMoora', fn($q) => $q->where('periode_tahun', $tahun))
+            ->join('hasil_moora', 'keputusan.hasil_moora_id', '=', 'hasil_moora.id')
+            ->orderBy('hasil_moora.prodi_id')
+            ->orderBy('hasil_moora.ranking_prodi')
+            ->select('keputusan.*')
+            ->get();
+
+        return $format === 'html'
+            ? $this->exportHTML($keputusan, $tahun)
+            : $this->exportCSV($keputusan, $tahun);
+    }
+
+    // ── Export CSV ───────────────────────────────────────────────────
+    private function exportCSV($keputusan, $tahun)
+    {
+        $filename = 'penerima_beasiswa_' . str_replace('/', '-', $tahun) . '_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($keputusan, $tahun) {
+            $out = fopen('php://output', 'w');
+            fputs($out, "\xEF\xBB\xBF"); // BOM UTF-8
+
+            fputcsv($out, ['DAFTAR PENERIMA BEASISWA CERDAS HUMANIS']);
+            fputcsv($out, ['Periode Tahun', $tahun]);
+            fputcsv($out, ['Tanggal Cetak', now()->format('d/m/Y H:i:s')]);
+            fputcsv($out, ['Total Penerima', $keputusan->count() . ' mahasiswa']);
+            fputcsv($out, []);
+
+            fputcsv($out, [
+                'No', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Jenjang',
+                'Semester', 'Ranking Prodi', 'Ranking Global', 'Skor MOORA',
+                'Kondisi Orang Tua', 'Penghasilan OT (Rp)',
+                'Tagihan Listrik (Rp)', 'Tanggungan Anak', 'Status',
+            ]);
+
+            foreach ($keputusan as $i => $k) {
+                $calon = $k->calon;
+                $moora = $k->hasilMoora;
+                fputcsv($out, [
+                    $i + 1,
+                    $calon->nim                  ?? '-',
+                    $calon->nama                 ?? '-',
+                    $calon->prodi?->nama         ?? '-',
+                    $calon->prodi?->jenjang      ?? '-',
+                    $calon->semester             ?? '-',
+                    $moora?->ranking_prodi       ?? '-',
+                    $moora?->ranking             ?? '-',
+                    number_format($moora?->skor_moora ?? 0, 6),
+                    $calon->kondisi_ortu         ?? '-',
+                    $calon->penghasilan_ortu     ?? 0,
+                    $calon->tagihan_listrik      ?? 0,
+                    $calon->tanggungan_anak      ?? 0,
+                    'PENERIMA BEASISWA',
+                ]);
+            }
+            fclose($out);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    // ── Export HTML (Print) ──────────────────────────────────────────
+    private function exportHTML($keputusan, $tahun)
+    {
+        $perProdi = $keputusan->groupBy(fn($k) => $k->calon->prodi->nama ?? 'Tidak Diketahui');
+
+        $html = '<!DOCTYPE html><html lang="id"><head>
+        <meta charset="UTF-8">
+        <title>Penerima Beasiswa ' . $tahun . '</title>
+        <style>
+            *{box-sizing:border-box;margin:0;padding:0}
+            body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:20px}
+            .header{text-align:center;margin-bottom:24px;border-bottom:3px solid #1e40af;padding-bottom:16px}
+            .header h1{font-size:16px;font-weight:800;color:#1e40af;margin-bottom:4px}
+            .header h2{font-size:13px;font-weight:600;margin-bottom:4px}
+            .header p{font-size:11px;color:#666}
+            .summary{display:flex;gap:16px;margin-bottom:20px}
+            .sum-box{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
+            .sum-num{font-size:22px;font-weight:800;color:#1e40af}
+            .sum-lbl{font-size:10px;color:#666;margin-top:2px}
+            .prodi-section{margin-bottom:24px}
+            .prodi-title{background:#1e40af;color:#fff;padding:8px 12px;border-radius:6px 6px 0 0;font-weight:700;font-size:12px;display:flex;justify-content:space-between}
+            table{width:100%;border-collapse:collapse}
+            th{background:#eff6ff;padding:7px 10px;text-align:left;font-size:11px;border:1px solid #bfdbfe}
+            td{padding:6px 10px;border:1px solid #e2e8f0;font-size:11px}
+            tr:nth-child(even) td{background:#f8fafc}
+            .rank-1 td{background:#fef9c3!important}
+            .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+            .b-green{background:#dcfce7;color:#15803d}
+            .ttd-area{margin-top:40px;display:flex;justify-content:flex-end}
+            .ttd-box{text-align:center;width:200px}
+            .ttd-box .line{border-top:1px solid #1a1a1a;margin-top:60px;padding-top:4px}
+            .no-print{margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:8px}
+            @media print{.no-print{display:none}@page{size:A4 landscape;margin:1cm}}
+        </style>
+        </head><body>';
+
+        $html .= '<div class="no-print">
+            <button onclick="window.print()" style="padding:8px 20px;background:#1e40af;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin-right:8px">
+                🖨️ Cetak / Simpan PDF
+            </button>
+            <button onclick="window.close()" style="padding:8px 16px;background:#e2e8f0;border:none;border-radius:6px;cursor:pointer">Tutup</button>
+        </div>';
+
+        $html .= '<div class="header">
+            <h1>DAFTAR PENERIMA BEASISWA CERDAS HUMANIS</h1>
+            <h2>Periode Tahun Akademik ' . $tahun . '</h2>
+            <p>Berdasarkan Metode MOORA — Ranking Per Program Studi</p>
+            <p>Dicetak: ' . now()->format('d F Y, H:i') . ' WIB</p>
+        </div>';
+
+        $html .= '<div class="summary">
+            <div class="sum-box"><div class="sum-num">' . $keputusan->count() . '</div><div class="sum-lbl">Total Penerima</div></div>
+            <div class="sum-box"><div class="sum-num">' . $perProdi->count() . '</div><div class="sum-lbl">Program Studi</div></div>
+            <div class="sum-box"><div class="sum-num">' . $tahun . '</div><div class="sum-lbl">Tahun Akademik</div></div>
+        </div>';
+
+        foreach ($perProdi as $prodiNama => $group) {
+            $html .= '<div class="prodi-section">
+                <div class="prodi-title">
+                    <span>' . $prodiNama . '</span>
+                    <span>' . $group->count() . ' Penerima</span>
+                </div>
+                <table><thead><tr>
+                    <th>No</th><th>NIM</th><th>Nama Mahasiswa</th><th>Semester</th>
+                    <th>Ranking Prodi</th><th>Ranking Global</th><th>Skor MOORA</th><th>Status</th>
+                </tr></thead><tbody>';
+
+            foreach ($group as $i => $k) {
+                $moora    = $k->hasilMoora;
+                $rowClass = ($moora?->ranking_prodi == 1) ? ' class="rank-1"' : '';
+                $html .= '<tr' . $rowClass . '>
+                    <td>' . ($i + 1) . '</td>
+                    <td><code>' . ($k->calon->nim ?? '-') . '</code></td>
+                    <td><strong>' . ($k->calon->nama ?? '-') . '</strong></td>
+                    <td>' . ($k->calon->semester ?? '-') . '</td>
+                    <td><strong>#' . ($moora?->ranking_prodi ?? '-') . '</strong></td>
+                    <td style="color:#64748b">#' . ($moora?->ranking ?? '-') . '</td>
+                    <td>' . number_format($moora?->skor_moora ?? 0, 4) . '</td>
+                    <td><span class="badge b-green">✓ PENERIMA</span></td>
+                </tr>';
+            }
+            $html .= '</tbody></table></div>';
+        }
+
+        $html .= '<div class="ttd-area">
+            <div class="ttd-box">
+                <p>Ditetapkan oleh,</p>
+                <div class="line"><strong>Ketua LKM</strong></div>
+            </div>
+        </div></body></html>';
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+}

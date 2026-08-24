@@ -1,0 +1,364 @@
+<?php
+
+// app/Services/MooraService.php
+// ================================================================
+// Implementasi MOORA (Multi-Objective Optimization by Ratio Analysis)
+//
+// Tahapan:
+//   1. Ambil calon lulus verifikasi
+//   2. Konversi nilai → skor sub kriteria
+//   3. Buat matriks keputusan
+//   4. Normalisasi matriks (/ akar jumlah kuadrat per kolom)
+//   5. Perkalian bobot
+//   6. Optimasi: Yi = Σbenefit − Σcost
+//   7. Ranking GLOBAL  (seluruh calon)
+//   8. Ranking PER PRODI (dalam prodi masing-masing)
+//   9. Simpan ke hasil_moora & calon_mahasiswa
+//
+// Referensi skor: skor_oleh_LKM.xls
+// ================================================================
+
+namespace App\Services;
+
+use App\Models\CalonMahasiswa;
+use App\Models\HasilMoora;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class MooraService
+{
+    // ── Kriteria MOORA ───────────────────────────────────────────────
+    // type  : benefit (+) → semakin tinggi semakin baik
+    //         cost    (-) → semakin rendah semakin baik
+    // bobot : total = 1.00
+    const KRITERIA = [
+        'kondisi_ortu'     => ['type' => 'benefit', 'bobot' => 0.30, 'label' => 'Kondisi Orang Tua'],
+        'penghasilan_ortu' => ['type' => 'cost',    'bobot' => 0.25, 'label' => 'Penghasilan OT'],
+        'tagihan_listrik'  => ['type' => 'cost',    'bobot' => 0.25, 'label' => 'Tagihan Listrik'],
+        'tanggungan_anak'  => ['type' => 'benefit', 'bobot' => 0.20, 'label' => 'Tanggungan Anak'],
+    ];
+
+    // ── Skor kondisi orang tua (sesuai skor_oleh_LKM.xls) ───────────
+    const SKOR_KONDISI = [
+        // 11 kondisi utama
+        'tidak_punya_ayah_ibu'            => 10, // Tidak mempunyai ayah dan ibu
+        'hanya_ayah_sehat'                =>  5, // Hanya ada ayah (ayah sehat)
+        'hanya_ibu_sehat'                 =>  5, // Hanya ada ibu (ibu sehat)
+        'ada_ayah_ibu_sehat'              =>  0, // Ada ayah dan ibu (keduanya sehat)
+        'ada_ayah_ibu_ayah_sakit_bekerja' =>  5, // Ada ayah & ibu, ayah sakit tidak bekerja
+        'ada_ayah_ibu_ayah_sakit_pensiun' =>  0, // Ada ayah & ibu, ayah sakit pensiunan
+        'ada_ayah_ibu_ibu_sakit_bekerja'  =>  5, // Ada ayah & ibu, ibu sakit tidak bekerja
+        'ada_ayah_ibu_ibu_sakit_pensiun'  =>  0, // Ada ayah & ibu, ibu sakit pensiunan
+        'ayah_ibu_sakit_tidak_bekerja'    => 10, // Ayah dan ibu keduanya sakit tidak bekerja
+        'hanya_ayah_sakit'                => 10, // Hanya ada ayah (ayah sakit)
+        'hanya_ibu_sakit'                 => 10, // Hanya ada ibu (ibu sakit)
+
+        // Fallback kode lama agar data existing tidak error
+        'yatim_piatu'                     => 10,
+        'yatim'                           =>  5,
+        'piatu'                           =>  5,
+        'cerai'                           =>  5,
+        'lengkap'                         =>  0,
+        'ada_ayah_sakit_tidak_bekerja'    =>  5,
+        'ada_ibu_sakit_tidak_bekerja'     =>  5,
+        'ada_ayah_sakit_pensiun'          =>  0,
+        'ada_ibu_sakit_pensiun'           =>  0,
+        'ada_ayah_ibu_sehat'              =>  0,
+    ];
+
+    // ================================================================
+    // KONVERSI NILAI → SKOR
+    // ================================================================
+
+    public static function skorKondisiOrtu(string $kondisi): int
+    {
+        return self::SKOR_KONDISI[$kondisi] ?? 0;
+    }
+
+    /**
+     * Penghasilan (Rp) → skor 1–4
+     * ≤ 1.000.000           → 4
+     * 1.000.001 – 2.000.000 → 3
+     * 2.000.001 – 3.500.000 → 2
+     * > 3.500.000           → 1
+     */
+    public static function skorPenghasilan(float $penghasilan): int
+    {
+        if ($penghasilan <= 1_000_000)  return 4;
+        if ($penghasilan <= 2_000_000)  return 3;
+        if ($penghasilan <= 3_500_000)  return 2;
+        return 1;
+    }
+
+    /**
+     * Tagihan listrik (Rp) → skor 0–3
+     * ≤ 100.000             → 3
+     * 100.001 – 300.000     → 2
+     * > 300.000             → 0
+     */
+    public static function skorTagihanListrik(float $tagihan): int
+    {
+        if ($tagihan <= 100_000) return 3;
+        if ($tagihan <= 300_000) return 2;
+        return 0;
+    }
+
+    /**
+     * Tanggungan anak → skor 1–3
+     * ≤ 1 anak  → 1
+     * 2 anak    → 2
+     * ≥ 3 anak  → 3
+     */
+    public static function skorTanggunganAnak(int $jumlah): int
+    {
+        if ($jumlah <= 1) return 1;
+        if ($jumlah === 2) return 2;
+        return 3;
+    }
+
+    // ================================================================
+    // HITUNG MOORA — ENTRY POINT UTAMA
+    // ================================================================
+
+    /**
+     * Hitung MOORA + ranking global + ranking per prodi.
+     *
+     * @param  string $tahun   Format "2023/2024"
+     * @param  int    $userId  ID user yang menjalankan perhitungan
+     * @return array  $skorList | ['error' => string]
+     */
+    public function hitung(string $tahun, int $userId): array
+    {
+        // ── 1. Ambil data calon lulus verifikasi ─────────────────────
+        $calons = CalonMahasiswa::with('prodi')
+            ->whereIn('status', ['lulus_verifikasi', 'ditetapkan'])
+            ->where(function ($q) use ($tahun) {
+                $q->where('tahun_akademik', $tahun)
+                  ->orWhere('tahun_akademik', 'LIKE', $tahun . '/%')
+                  ->orWhere('tahun_akademik', 'LIKE', '%/' . $tahun);
+            })
+            ->get();
+
+        if ($calons->isEmpty()) {
+            return ['error' => "Tidak ada calon yang lulus verifikasi untuk periode {$tahun}."];
+        }
+
+        // ── 2. Buat Matriks Keputusan ────────────────────────────────
+        $matrix = [];
+        foreach ($calons as $calon) {
+            $matrix[$calon->id] = [
+                'kondisi_ortu'     => self::skorKondisiOrtu((string)($calon->kondisi_ortu ?? '')),
+                'penghasilan_ortu' => self::skorPenghasilan((float)($calon->penghasilan_ortu ?? 0)),
+                'tagihan_listrik'  => self::skorTagihanListrik((float)($calon->tagihan_listrik ?? 0)),
+                'tanggungan_anak'  => self::skorTanggunganAnak((int)($calon->tanggungan_anak ?? 0)),
+            ];
+        }
+
+        // ── 3. Normalisasi Matriks ────────────────────────────────────
+        // r_ij = x_ij / √(Σ x_ij²) per kolom
+        $denominator = [];
+        foreach (array_keys(self::KRITERIA) as $krit) {
+            $sumSq = array_sum(array_map(fn($row) => pow($row[$krit], 2), $matrix));
+            $denominator[$krit] = $sumSq > 0 ? sqrt($sumSq) : 1;
+        }
+
+        // ── 4. Hitung Yi (skor MOORA) ─────────────────────────────────
+        // Yi = Σ(bobot × r_ij)_benefit − Σ(bobot × r_ij)_cost
+        $skorList = [];
+        foreach ($matrix as $calonId => $row) {
+            $yi       = 0;
+            $detail   = [];
+            $calonObj = $calons->firstWhere('id', $calonId);
+
+            foreach (self::KRITERIA as $krit => $cfg) {
+                $normalized = $row[$krit] / $denominator[$krit];
+                $weighted   = $normalized * $cfg['bobot'];
+
+                $yi += ($cfg['type'] === 'benefit') ? $weighted : -$weighted;
+
+                $detail[$krit] = [
+                    'label'      => $cfg['label'],
+                    'nilai_asli' => $calonObj?->$krit ?? null,
+                    'nilai_skor' => $row[$krit],
+                    'normalized' => round($normalized, 6),
+                    'weighted'   => round($weighted, 6),
+                    'type'       => $cfg['type'],
+                    'bobot'      => $cfg['bobot'],
+                ];
+            }
+
+            $skorList[] = [
+                'calon_id' => $calonId,
+                'prodi_id' => $calonObj?->prodi_id,
+                'skor'     => round($yi, 6),
+                'detail'   => $detail,
+            ];
+        }
+
+        // ── 5. Ranking GLOBAL — sort descending ───────────────────────
+        usort($skorList, fn($a, $b) => $b['skor'] <=> $a['skor']);
+
+        // Assign ranking global (1, 2, 3, ...)
+        foreach ($skorList as $rank => &$item) {
+            $item['ranking_global'] = $rank + 1;
+        }
+        unset($item);
+
+        // ── 6. Ranking PER PRODI ──────────────────────────────────────
+        // Kelompokkan berdasarkan prodi_id, urutkan ulang, assign ranking_prodi
+        $perProdi = [];
+        foreach ($skorList as $item) {
+            $perProdi[$item['prodi_id']][] = $item;
+        }
+
+        // Setiap prodi sudah terurut descending (ikut urutan global)
+        // Assign ranking_prodi mulai dari 1
+        $rankProdiMap = []; // [calon_id => ranking_prodi]
+        foreach ($perProdi as $prodiId => $items) {
+            // Sort ulang per prodi (seharusnya sudah urut, tapi pastikan)
+            usort($items, fn($a, $b) => $b['skor'] <=> $a['skor']);
+            foreach ($items as $rankProdi => $item) {
+                $rankProdiMap[$item['calon_id']] = $rankProdi + 1;
+            }
+        }
+
+        // Masukkan ranking_prodi ke skorList
+        foreach ($skorList as &$item) {
+            $item['ranking_prodi'] = $rankProdiMap[$item['calon_id']] ?? null;
+        }
+        unset($item);
+
+        // ── 7. Simpan ke database ─────────────────────────────────────
+        DB::beginTransaction();
+        try {
+            // Hapus hasil lama untuk tahun ini
+            $oldIds = HasilMoora::where('periode_tahun', $tahun)->pluck('id');
+            \App\Models\Keputusan::whereIn('hasil_moora_id', $oldIds)->delete();
+            HasilMoora::where('periode_tahun', $tahun)->delete();
+
+            foreach ($skorList as $item) {
+                HasilMoora::create([
+                    'calon_id'      => $item['calon_id'],
+                    'periode_tahun' => $tahun,
+                    'prodi_id'      => $item['prodi_id'],
+                    'yi_score'      => $item['skor'],       // kolom lama
+                    'skor_moora'    => $item['skor'],       // kolom baru (alias)
+                    'ranking'       => $item['ranking_global'],
+                    'ranking_prodi' => $item['ranking_prodi'],
+                    'detail_hitung' => json_encode($item['detail']),
+                    'dihitung_oleh' => $userId,
+                    'dihitung_at'   => now(),
+                ]);
+
+                CalonMahasiswa::where('id', $item['calon_id'])->update([
+                    'skor_moora' => $item['skor'],
+                    'ranking'    => $item['ranking_global'],
+                ]);
+            }
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('MOORA hitung error: ' . $e->getMessage(), [
+                'tahun'  => $tahun,
+                'trace'  => $e->getTraceAsString(),
+            ]);
+            return ['error' => 'Gagal menyimpan hasil perhitungan: ' . $e->getMessage()];
+        }
+
+        return $skorList;
+    }
+
+    // ================================================================
+    // QUERY HELPERS
+    // ================================================================
+
+    /**
+     * Ambil ranking global, opsional filter per prodi.
+     */
+    public function getRanking(string $tahun, ?int $prodiId = null)
+    {
+        $query = HasilMoora::with(['calon.prodi'])
+            ->where('periode_tahun', $tahun);
+
+        if ($prodiId) {
+            $query->where('prodi_id', $prodiId);
+        }
+
+        return $query->orderBy('ranking')->get();
+    }
+
+   /**
+     * Ambil ranking dikelompokkan per prodi (untuk view BAPSI & LKM).
+     */
+    public function getRankingPerProdi(string $tahun)
+    {
+        $hasil = HasilMoora::with(['calon.prodi', 'keputusan'])
+            ->where('periode_tahun', $tahun)
+            ->orderBy('prodi_id')
+            ->orderByRaw('COALESCE(ranking_prodi, ranking) ASC')
+            ->get();
+
+        if ($hasil->isEmpty()) return collect();
+
+        return $hasil->groupBy('prodi_id')->map(function ($items) {
+            $firstItem = $items->first();
+            $prodi = $firstItem->prodi
+                  ?? $firstItem->calon?->prodi
+                  ?? null;
+
+            return [
+                'prodi' => $prodi,
+                'items' => $items,
+                'total' => $items->count(),
+            ];
+        })->values();
+    }
+
+    /**
+     * Statistik singkat untuk dashboard.
+     */
+    public function getStatistik(string $tahun): array
+    {
+        $hasil = HasilMoora::where('periode_tahun', $tahun)->get();
+        $skors = $hasil->map(fn($h) => (float)($h->skor_moora ?? $h->yi_score ?? 0));
+
+        return [
+            'total_calon' => $hasil->count(),
+            'total_prodi' => $hasil->unique('prodi_id')->count(),
+            'skor_max'    => $skors->max() ?? 0,
+            'skor_min'    => $skors->min() ?? 0,
+            'skor_avg'    => round($skors->avg() ?? 0, 4),
+        ];
+    }
+   
+
+    /**
+     * Getter kriteria untuk tampilan.
+     */
+    public static function kriteriaList(): array
+    {
+        return self::KRITERIA;
+    }
+
+    /**
+     * Daftar kondisi ortu dengan label & skor — untuk dropdown form.
+     */
+    public static function kondisiOrtuList(): array
+    {
+        return [
+            'tidak_punya_ayah_ibu'            => ['label' => 'Tidak mempunyai ayah dan ibu',                   'skor' => 10],
+            'hanya_ayah_sehat'                => ['label' => 'Hanya ada ayah dalam keluarga (ayah sehat)',      'skor' =>  5],
+            'hanya_ibu_sehat'                 => ['label' => 'Hanya ada ibu dalam keluarga (ibu sehat)',        'skor' =>  5],
+            'ada_ayah_ibu_sehat'              => ['label' => 'Ada ayah dan ibu dalam keluarga (keduanya sehat)','skor' =>  0],
+            'ada_ayah_ibu_ayah_sakit_bekerja' => ['label' => 'Ada ayah & ibu, ayah sakit tidak bekerja',       'skor' =>  5],
+            'ada_ayah_ibu_ayah_sakit_pensiun' => ['label' => 'Ada ayah & ibu, ayah sakit pensiunan',           'skor' =>  0],
+            'ada_ayah_ibu_ibu_sakit_bekerja'  => ['label' => 'Ada ayah & ibu, ibu sakit tidak bekerja',        'skor' =>  5],
+            'ada_ayah_ibu_ibu_sakit_pensiun'  => ['label' => 'Ada ayah & ibu, ibu sakit pensiunan',            'skor' =>  0],
+            'ayah_ibu_sakit_tidak_bekerja'    => ['label' => 'Ayah dan ibu keduanya sakit tidak bekerja',      'skor' => 10],
+            'hanya_ayah_sakit'                => ['label' => 'Hanya ada ayah dalam keluarga (ayah sakit)',     'skor' => 10],
+            'hanya_ibu_sakit'                 => ['label' => 'Hanya ada ibu dalam keluarga (ibu sakit)',       'skor' => 10],
+        ];
+    }
+}

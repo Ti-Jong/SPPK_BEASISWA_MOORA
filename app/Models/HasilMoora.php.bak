@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class HasilMoora extends Model
+{
+    protected $table = 'hasil_moora'; // ✅ nama tabel benar
+
+    protected $fillable = [
+        'calon_id',
+        'prodi_id',
+        'skor_moora',
+        'ranking',
+        'periode_tahun',
+        'detail_hitung',
+        'dihitung_oleh',
+        'dihitung_at',
+    ];
+
+    // ✅ FIX UTAMA — cast JSON ke array otomatis
+    protected $casts = [
+        'detail_hitung' => 'array',
+        'dihitung_at'   => 'datetime',
+    ];
+
+    public function calon()
+    {
+        return $this->belongsTo(CalonMahasiswa::class, 'calon_id');
+    }
+
+    public function prodi()
+    {
+        return $this->belongsTo(Prodi::class, 'prodi_id');
+    }
+
+    public function dihitungOleh()
+    {
+        return $this->belongsTo(User::class, 'dihitung_oleh');
+    }
+     public function keputusan()
+    {
+        return $this->hasOne(\App\Models\Keputusan::class, 'hasil_moora_id');
+    }   
+
+}

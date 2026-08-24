@@ -1,0 +1,248 @@
+F:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysqld, Version: 8.0.30 (MySQL Community Server - GPL). started with:
+TCP Port: 3307, Named Pipe: /tmp/mysql.sock
+Time                 Id Command    Argument
+2026-06-20T04:26:14.273280Z	    9 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:26:14.274804Z	    9 Query	use `spk_beasiswa_demo`
+2026-06-20T04:26:14.282826Z	    9 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:14.285133Z	    9 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:14.289184Z	    9 Close stmt	
+2026-06-20T04:26:14.289359Z	    9 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:14.289436Z	    9 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:14.292259Z	    9 Close stmt	
+2026-06-20T04:26:14.402575Z	    9 Prepare	select * from `users` where `username` = ? limit 1
+2026-06-20T04:26:14.454773Z	    9 Execute	select * from `users` where `username` = 'admin_bapsi' limit 1
+2026-06-20T04:26:14.487211Z	    9 Close stmt	
+2026-06-20T04:26:15.002499Z	    9 Quit	
+2026-06-20T04:26:15.325915Z	   10 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:26:15.326331Z	   10 Query	use `spk_beasiswa_demo`
+2026-06-20T04:26:15.326607Z	   10 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:15.326710Z	   10 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:15.326863Z	   10 Close stmt	
+2026-06-20T04:26:15.326953Z	   10 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:15.327031Z	   10 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:15.327133Z	   10 Close stmt	
+2026-06-20T04:26:15.327385Z	   10 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:26:15.327747Z	   10 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:26:15.327762Z	   10 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:26:15.328037Z	   10 Close stmt	
+2026-06-20T04:26:15.353631Z	   10 Prepare	select `periode_tahun` from `hasil_moora` order by `periode_tahun` desc limit 1
+2026-06-20T04:26:15.353799Z	   10 Execute	select `periode_tahun` from `hasil_moora` order by `periode_tahun` desc limit 1
+2026-06-20T04:26:15.377686Z	   10 Close stmt	
+2026-06-20T04:26:15.418385Z	   10 Prepare	select count(*) as aggregate from `calon_mahasiswa`
+2026-06-20T04:26:15.418548Z	   10 Execute	select count(*) as aggregate from `calon_mahasiswa`
+2026-06-20T04:26:15.451499Z	   10 Close stmt	
+2026-06-20T04:26:15.454738Z	   10 Prepare	select count(*) as aggregate from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:26:15.455059Z	   10 Execute	select count(*) as aggregate from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses')
+2026-06-20T04:26:15.459756Z	   10 Close stmt	
+2026-06-20T04:26:15.460323Z	   10 Prepare	select count(*) as aggregate from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:26:15.460560Z	   10 Execute	select count(*) as aggregate from `calon_mahasiswa` where `status` in ('lulus_verifikasi', 'ditetapkan')
+2026-06-20T04:26:15.461804Z	   10 Close stmt	
+2026-06-20T04:26:15.462307Z	   10 Prepare	select * from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:26:15.462494Z	   10 Execute	select * from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses')
+2026-06-20T04:26:15.464799Z	   10 Close stmt	
+2026-06-20T04:26:15.465354Z	   10 Prepare	select * from `hasil_moora` where `periode_tahun` = ? order by `ranking` asc limit 5
+2026-06-20T04:26:15.465592Z	   10 Execute	select * from `hasil_moora` where `periode_tahun` = '2025/2026' order by `ranking` asc limit 5
+2026-06-20T04:26:15.521347Z	   10 Close stmt	
+2026-06-20T04:26:15.728591Z	   10 Prepare	select * from `calon_mahasiswa` where `calon_mahasiswa`.`id` in (472, 473, 535, 548, 556)
+2026-06-20T04:26:15.728786Z	   10 Execute	select * from `calon_mahasiswa` where `calon_mahasiswa`.`id` in (472, 473, 535, 548, 556)
+2026-06-20T04:26:15.732485Z	   10 Close stmt	
+2026-06-20T04:26:15.755767Z	   10 Prepare	select * from `prodi` where `prodi`.`id` in (4, 5, 6, 11)
+2026-06-20T04:26:15.755933Z	   10 Execute	select * from `prodi` where `prodi`.`id` in (4, 5, 6, 11)
+2026-06-20T04:26:15.769966Z	   10 Close stmt	
+2026-06-20T04:26:15.770865Z	   10 Prepare	select * from `calon_mahasiswa` where `status` in (?, ?) order by `created_at` desc limit 8
+2026-06-20T04:26:15.771026Z	   10 Execute	select * from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses') order by `created_at` desc limit 8
+2026-06-20T04:26:15.772154Z	   10 Close stmt	
+2026-06-20T04:26:16.037767Z	   10 Quit	
+2026-06-20T04:26:18.645548Z	   11 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:26:18.646438Z	   11 Query	use `spk_beasiswa_demo`
+2026-06-20T04:26:18.646793Z	   11 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:18.646949Z	   11 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:26:18.647232Z	   11 Close stmt	
+2026-06-20T04:26:18.647369Z	   11 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:18.647454Z	   11 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:26:18.647709Z	   11 Close stmt	
+2026-06-20T04:26:18.648092Z	   11 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:26:18.648806Z	   11 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:26:18.648835Z	   11 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:26:18.649266Z	   11 Close stmt	
+2026-06-20T04:26:18.849773Z	   11 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:26:18.849907Z	   11 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:26:18.861401Z	   11 Close stmt	
+2026-06-20T04:26:18.923370Z	   11 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:26:18.923505Z	   11 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:26:18.930863Z	   11 Close stmt	
+2026-06-20T04:26:19.123765Z	   11 Quit	
+2026-06-20T04:27:06.785178Z	   12 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:06.785600Z	   12 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:06.785819Z	   12 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:06.785914Z	   12 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:06.786016Z	   12 Close stmt	
+2026-06-20T04:27:06.786126Z	   12 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:06.786198Z	   12 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:06.786336Z	   12 Close stmt	
+2026-06-20T04:27:06.786596Z	   12 Prepare	select * from `users` where `username` = ? limit 1
+2026-06-20T04:27:06.786963Z	   12 Execute	select * from `users` where `username` = 'admin_bapsi' limit 1
+2026-06-20T04:27:06.787319Z	   12 Close stmt	
+2026-06-20T04:27:07.029249Z	   12 Quit	
+2026-06-20T04:27:07.284607Z	   13 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:07.285017Z	   13 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:07.285262Z	   13 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:07.285314Z	   13 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:07.285430Z	   13 Close stmt	
+2026-06-20T04:27:07.285518Z	   13 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:07.285595Z	   13 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:07.285775Z	   13 Close stmt	
+2026-06-20T04:27:07.285996Z	   13 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:07.286388Z	   13 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:07.286407Z	   13 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:07.286668Z	   13 Close stmt	
+2026-06-20T04:27:07.290293Z	   13 Prepare	select `periode_tahun` from `hasil_moora` order by `periode_tahun` desc limit 1
+2026-06-20T04:27:07.290419Z	   13 Execute	select `periode_tahun` from `hasil_moora` order by `periode_tahun` desc limit 1
+2026-06-20T04:27:07.290928Z	   13 Close stmt	
+2026-06-20T04:27:07.291703Z	   13 Prepare	select count(*) as aggregate from `calon_mahasiswa`
+2026-06-20T04:27:07.291788Z	   13 Execute	select count(*) as aggregate from `calon_mahasiswa`
+2026-06-20T04:27:07.292855Z	   13 Close stmt	
+2026-06-20T04:27:07.293136Z	   13 Prepare	select count(*) as aggregate from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:27:07.293233Z	   13 Execute	select count(*) as aggregate from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses')
+2026-06-20T04:27:07.293696Z	   13 Close stmt	
+2026-06-20T04:27:07.293873Z	   13 Prepare	select count(*) as aggregate from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:27:07.293957Z	   13 Execute	select count(*) as aggregate from `calon_mahasiswa` where `status` in ('lulus_verifikasi', 'ditetapkan')
+2026-06-20T04:27:07.294422Z	   13 Close stmt	
+2026-06-20T04:27:07.294607Z	   13 Prepare	select * from `calon_mahasiswa` where `status` in (?, ?)
+2026-06-20T04:27:07.294707Z	   13 Execute	select * from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses')
+2026-06-20T04:27:07.295663Z	   13 Close stmt	
+2026-06-20T04:27:07.295870Z	   13 Prepare	select * from `hasil_moora` where `periode_tahun` = ? order by `ranking` asc limit 5
+2026-06-20T04:27:07.295959Z	   13 Execute	select * from `hasil_moora` where `periode_tahun` = '2025/2026' order by `ranking` asc limit 5
+2026-06-20T04:27:07.297070Z	   13 Close stmt	
+2026-06-20T04:27:07.298682Z	   13 Prepare	select * from `calon_mahasiswa` where `calon_mahasiswa`.`id` in (472, 473, 535, 548, 556)
+2026-06-20T04:27:07.298808Z	   13 Execute	select * from `calon_mahasiswa` where `calon_mahasiswa`.`id` in (472, 473, 535, 548, 556)
+2026-06-20T04:27:07.299167Z	   13 Close stmt	
+2026-06-20T04:27:07.299928Z	   13 Prepare	select * from `prodi` where `prodi`.`id` in (4, 5, 6, 11)
+2026-06-20T04:27:07.300041Z	   13 Execute	select * from `prodi` where `prodi`.`id` in (4, 5, 6, 11)
+2026-06-20T04:27:07.300322Z	   13 Close stmt	
+2026-06-20T04:27:07.300795Z	   13 Prepare	select * from `calon_mahasiswa` where `status` in (?, ?) order by `created_at` desc limit 8
+2026-06-20T04:27:07.300892Z	   13 Execute	select * from `calon_mahasiswa` where `status` in ('menunggu_verifikasi', 'diproses') order by `created_at` desc limit 8
+2026-06-20T04:27:07.302028Z	   13 Close stmt	
+2026-06-20T04:27:07.334067Z	   13 Quit	
+2026-06-20T04:27:09.445697Z	   14 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:09.446347Z	   14 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:09.446691Z	   14 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:09.446794Z	   14 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:09.446999Z	   14 Close stmt	
+2026-06-20T04:27:09.447095Z	   14 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:09.447164Z	   14 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:09.447321Z	   14 Close stmt	
+2026-06-20T04:27:09.447595Z	   14 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:09.448083Z	   14 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:09.448105Z	   14 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:09.448439Z	   14 Close stmt	
+2026-06-20T04:27:09.452610Z	   14 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:09.452724Z	   14 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:09.453040Z	   14 Close stmt	
+2026-06-20T04:27:09.454791Z	   14 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:09.454913Z	   14 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:09.455271Z	   14 Close stmt	
+2026-06-20T04:27:09.494311Z	   14 Quit	
+2026-06-20T04:27:17.158919Z	   15 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:17.159253Z	   15 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:17.159493Z	   15 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:17.159526Z	   15 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:17.159682Z	   15 Close stmt	
+2026-06-20T04:27:17.159773Z	   15 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:17.159793Z	   15 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:17.159948Z	   15 Close stmt	
+2026-06-20T04:27:17.160286Z	   15 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:17.160752Z	   15 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:17.160767Z	   15 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:17.161031Z	   15 Close stmt	
+2026-06-20T04:27:17.716231Z	   15 Quit	
+2026-06-20T04:27:18.264574Z	   16 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:18.264919Z	   16 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:18.265158Z	   16 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:18.265254Z	   16 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:18.265439Z	   16 Close stmt	
+2026-06-20T04:27:18.265519Z	   16 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:18.265594Z	   16 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:18.265708Z	   16 Close stmt	
+2026-06-20T04:27:18.266059Z	   16 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:18.266351Z	   16 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:18.266365Z	   16 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:18.266605Z	   16 Close stmt	
+2026-06-20T04:27:18.269684Z	   16 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:18.269794Z	   16 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:18.270087Z	   16 Close stmt	
+2026-06-20T04:27:18.271672Z	   16 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:18.271784Z	   16 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:18.272131Z	   16 Close stmt	
+2026-06-20T04:27:18.302744Z	   16 Quit	
+2026-06-20T04:27:24.405995Z	   17 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:24.406399Z	   17 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:24.406685Z	   17 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:24.406741Z	   17 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:24.406927Z	   17 Close stmt	
+2026-06-20T04:27:24.407075Z	   17 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:24.407120Z	   17 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:24.407223Z	   17 Close stmt	
+2026-06-20T04:27:24.407518Z	   17 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:24.408076Z	   17 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:24.408098Z	   17 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:24.408472Z	   17 Close stmt	
+2026-06-20T04:27:24.416384Z	   17 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:24.416537Z	   17 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:24.417151Z	   17 Close stmt	
+2026-06-20T04:27:24.421001Z	   17 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:24.421084Z	   17 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:24.421580Z	   17 Close stmt	
+2026-06-20T04:27:24.466872Z	   17 Quit	
+2026-06-20T04:27:26.679809Z	   18 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:26.680270Z	   18 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:26.680605Z	   18 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:26.680692Z	   18 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:26.680859Z	   18 Close stmt	
+2026-06-20T04:27:26.680953Z	   18 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:26.681116Z	   18 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:26.681300Z	   18 Close stmt	
+2026-06-20T04:27:26.681757Z	   18 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:26.682585Z	   18 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:26.682608Z	   18 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:26.682953Z	   18 Close stmt	
+2026-06-20T04:27:26.687963Z	   18 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:26.688225Z	   18 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:26.688764Z	   18 Close stmt	
+2026-06-20T04:27:26.691194Z	   18 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:26.691324Z	   18 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:26.691839Z	   18 Close stmt	
+2026-06-20T04:27:26.738491Z	   18 Quit	
+2026-06-20T04:27:33.012720Z	   19 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:33.013380Z	   19 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:33.013863Z	   19 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:33.014039Z	   19 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:33.014334Z	   19 Close stmt	
+2026-06-20T04:27:33.014494Z	   19 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:33.014659Z	   19 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:33.014946Z	   19 Close stmt	
+2026-06-20T04:27:33.015386Z	   19 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:33.015947Z	   19 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:33.015982Z	   19 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:33.016435Z	   19 Close stmt	
+2026-06-20T04:27:33.121352Z	   19 Quit	
+2026-06-20T04:27:33.358578Z	   20 Connect	root@localhost on spk_beasiswa_demo using TCP/IP
+2026-06-20T04:27:33.359181Z	   20 Query	use `spk_beasiswa_demo`
+2026-06-20T04:27:33.359509Z	   20 Prepare	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:33.359618Z	   20 Execute	set names 'utf8mb4' collate 'utf8mb4_unicode_ci'
+2026-06-20T04:27:33.359806Z	   20 Close stmt	
+2026-06-20T04:27:33.359889Z	   20 Prepare	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:33.359936Z	   20 Execute	set session sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'
+2026-06-20T04:27:33.360097Z	   20 Close stmt	
+2026-06-20T04:27:33.360353Z	   20 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:33.360800Z	   20 Prepare	select * from `users` where `id` = ? limit 1
+2026-06-20T04:27:33.360824Z	   20 Execute	select * from `users` where `id` = 2 limit 1
+2026-06-20T04:27:33.361144Z	   20 Close stmt	
+2026-06-20T04:27:33.364693Z	   20 Prepare	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:33.364804Z	   20 Execute	select * from `kriteria` where `deleted_at` is null and `kriteria`.`deleted_at` is null order by `urutan` asc
+2026-06-20T04:27:33.365139Z	   20 Close stmt	
+2026-06-20T04:27:33.366666Z	   20 Prepare	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:33.366774Z	   20 Execute	select * from `sub_kriteria` where `sub_kriteria`.`kriteria_id` in (1, 2, 3, 4)
+2026-06-20T04:27:33.367070Z	   20 Close stmt	
+2026-06-20T04:27:33.397074Z	   20 Quit	
+2026-06-20T04:27:45.318110Z	    8 Query	SET GLOBAL general_log = 'OFF'

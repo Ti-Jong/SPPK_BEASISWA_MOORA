@@ -1,0 +1,166 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class CalonMahasiswa extends Model
+{
+    use HasFactory;
+
+    protected $table = 'calon_mahasiswa'; // ← nama tabel tanpa 's'
+
+    protected $fillable = [
+        'nim',
+        'nama',
+        'asal_sekolah',
+        'nilai_rapor_sem3',
+        'nilai_rapor_sem4',
+        'prodi_id',
+        'semester',
+        'tahun_akademik',
+        'penghasilan_ortu',
+        'tagihan_listrik',
+        'tanggungan_anak',
+        'kondisi_ortu',
+        'status',
+        'catatan',
+        'alasan_penolakan',   // ← BARU: alasan penolakan dari BAPSI (terpisah dari catatan)
+        'skor_moora',         // ← BARU: hasil kalkulasi MOORA
+        'ranking',            // ← BARU: peringkat setelah MOORA
+        'input_by',
+        'verifikasi_by',
+        'verifikasi_at',
+    ];
+
+    protected $casts = [
+        'verifikasi_at'    => 'datetime',
+        'nilai_rapor_sem3' => 'decimal:2',
+        'nilai_rapor_sem4' => 'decimal:2',
+        'penghasilan_ortu' => 'integer',
+        'tagihan_listrik'  => 'integer',
+        'tanggungan_anak'  => 'integer',
+        'tahun_akademik'   => 'integer',
+        'skor_moora'       => 'decimal:6',
+        'ranking'          => 'integer',
+    ];
+
+    // ─── Relasi ───────────────────────────────────
+
+    public function prodi()
+    {
+        return $this->belongsTo(Prodi::class, 'prodi_id');
+    }
+
+    public function dokumen()
+    {
+        return $this->hasMany(Dokumen::class, 'calon_id');
+    }
+
+    public function inputBy()
+    {
+        return $this->belongsTo(User::class, 'input_by');
+    }
+
+    public function verifikasiBy()
+    {
+        return $this->belongsTo(User::class, 'verifikasi_by');
+    }
+
+    // ─── Methods ──────────────────────────────────
+
+    /**
+     * Daftar jenis dokumen yang wajib dilengkapi.
+     */
+    public static function jenisDokumenWajib(): array
+    {
+        return [
+            'surat_rekomendasi',
+            'rapor_semester_3',
+            'rapor_semester_4',
+            'kartu_keluarga',
+            'foto_rumah',
+            'sktm',
+            'tagihan_listrik',
+            'surat_penghasilan',
+        ];
+    }
+
+    /**
+     * Cek apakah semua dokumen wajib sudah diupload.
+     * Dipanggil di blade: $c->isDokumenLengkap()
+     */
+    public function isDokumenLengkap(): bool
+    {
+        $jenisUploaded = $this->dokumen->pluck('jenis')->toArray();
+        foreach (self::jenisDokumenWajib() as $wajib) {
+            if (!in_array($wajib, $jenisUploaded)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Status dokumen: 'lengkap' / 'sebagian' / 'belum'
+     * Dipanggil di blade: $c->statusDokumen()
+     */
+    public function statusDokumen(): string
+    {
+        $jumlah = $this->dokumen->count();
+        if ($jumlah === 0) return 'belum';
+        if ($this->isDokumenLengkap()) return 'lengkap';
+        return 'sebagian';
+    }
+
+    // ─── Scopes ───────────────────────────────────
+
+    public function scopeTahun($query, $tahun)
+    {
+        return $query->where('tahun_akademik', $tahun);
+    }
+
+    public function scopeStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    // ─── Accessors ────────────────────────────────
+
+    /**
+     * Label kondisi orang tua yang mudah dibaca.
+     */
+    public function getKondisiOrtuLabelAttribute(): string
+    {
+        $map = [
+            'yatim_piatu_tidak_bekerja'  => 'Yatim Piatu, tidak ada yang bekerja',
+            'yatim_piatu_bekerja'        => 'Yatim Piatu, ada yang bekerja',
+            'piatu_tidak_bekerja'        => 'Piatu (Ibu meninggal), Ayah tidak bekerja',
+            'piatu_bekerja'              => 'Piatu (Ibu meninggal), Ayah bekerja',
+            'yatim_tidak_bekerja'        => 'Yatim (Ayah meninggal), Ibu tidak bekerja',
+            'yatim_bekerja'              => 'Yatim (Ayah meninggal), Ibu bekerja',
+            'lengkap_salah_satu_bekerja' => 'Orang tua lengkap, salah satu bekerja',
+            'lengkap_keduanya_bekerja'   => 'Orang tua lengkap, keduanya bekerja',
+            'lengkap_tidak_bekerja'      => 'Orang tua lengkap, keduanya tidak bekerja',
+            'cerai_tidak_bekerja'        => 'Orang tua cerai, tidak ada yang bekerja',
+            'cerai_bekerja'              => 'Orang tua cerai, ada yang bekerja',
+        ];
+        return $map[$this->kondisi_ortu] ?? ($this->kondisi_ortu ?? '-');
+    }
+
+    /**
+     * Label status dengan emoji untuk UI.
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return match($this->status) {
+            'draft'        => '📝 Draft',
+            'diajukan'     => '📤 Diajukan',
+            'diverifikasi' => '✅ Diverifikasi',
+            'ditolak'      => '❌ Ditolak',
+            'ditetapkan'   => '🏆 Ditetapkan',
+            default        => ucfirst($this->status),
+        };
+    }
+}
